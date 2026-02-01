@@ -135,9 +135,23 @@ async function initAdmin() {
     document.getElementById('save-hola')?.addEventListener('click', async () => {
         const nombre = document.getElementById('hola-nombre').value;
         const mensaje = document.getElementById('hola-mensaje').value;
-        if (!nombre || !mensaje) return alert('Completa todos los campos');
+        const color = document.getElementById('hola-color').value;
+        const nombre_artista = document.getElementById('hola-artista').value;
+        const url_imagen = document.getElementById('hola-imagen').value;
+        const emoji_1 = document.getElementById('hola-emoji1').value;
+        const emoji_2 = document.getElementById('hola-emoji2').value;
 
-        const { error } = await _supabase.from('mensajes').insert([{ nombre, mensaje }]);
+        if (!nombre || !mensaje) return alert('Completa nombre y mensaje');
+
+        const { error } = await _supabase.from('mensajes').insert([{
+            nombre,
+            mensaje,
+            color,
+            nombre_artista,
+            url_imagen,
+            emoji_1,
+            emoji_2
+        }]);
         if (error) alert(error.message);
         else {
             alert('¡Mensaje creado!');

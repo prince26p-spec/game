@@ -91,6 +91,39 @@
         <!-- Emoji Container -->
         <div id="emoji-container" class="absolute inset-0 pointer-events-none overflow-hidden z-20"></div>
 
+        <!-- Mobile Controls -->
+        <div id="mobile-controls"
+            class="absolute bottom-8 left-0 right-0 flex justify-between px-8 pointer-events-none z-40">
+            <!-- Left Side - Movement -->
+            <div class="flex gap-3 pointer-events-auto">
+                <!-- Left Button (Default points LEFT -> No transform) -->
+                <button id="btn-left"
+                    class="w-20 h-20 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+                    style="background: transparent; border: none;">
+                    <img src="assets/artistas/boton.png" alt="Left"
+                        class="w-full h-full opacity-60 hover:opacity-80 active:opacity-100 transition-opacity">
+                </button>
+                <!-- Right Button (Flip to point RIGHT -> scaleX(-1)) -->
+                <button id="btn-right"
+                    class="w-20 h-20 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+                    style="background: transparent; border: none;">
+                    <img src="assets/artistas/boton.png" alt="Right"
+                        class="w-full h-full opacity-60 hover:opacity-80 active:opacity-100 transition-opacity"
+                        style="transform: scaleX(-1);">
+                </button>
+            </div>
+
+            <!-- Right Side - Jump -->
+            <div class="pointer-events-auto">
+                <button id="btn-jump"
+                    class="w-24 h-24 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+                    style="background: transparent; border: none;">
+                    <img src="assets/artistas/noFilter.webp" alt="Jump"
+                        class="w-full h-full opacity-70 hover:opacity-90 active:opacity-100 transition-opacity">
+                </button>
+            </div>
+        </div>
+
         <!-- Game World UI (Dialogues) -->
         <div id="game-ui-layer" class="absolute inset-0 pointer-events-none overflow-hidden z-30"></div>
     </div>
@@ -153,6 +186,25 @@
                     </button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Game Over Overlay (Time Up) -->
+    <div id="gameover-overlay"
+        class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+        <div
+            class="bg-white p-8 rounded-3xl max-w-sm text-center mx-4 shadow-2xl relative overflow-hidden animate__animated animate__fadeInDown">
+            <!-- Decorative Strip -->
+            <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-red-400 via-orange-400 to-red-400"></div>
+
+            <h2 class="text-3xl font-bold text-red-500 mb-2 font-script">¡Se acabó el tiempo!</h2>
+            <div class="text-6xl mb-4 animate__animated animate__tada animate__infinite">⏰</div>
+            <p class="text-lg text-gray-600 mb-6">¡Inténtalo de nuevo!</p>
+
+            <button onclick="location.reload()"
+                class="w-full bg-gradient-to-r from-red-500 to-orange-500 text-white px-6 py-3 rounded-full text-lg font-bold shadow-lg hover:scale-105 transition-transform active:scale-95 flex items-center justify-center gap-2">
+                <span>🔄</span> Aceptar
+            </button>
         </div>
     </div>
 

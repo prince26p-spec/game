@@ -28,7 +28,12 @@ const ASSETS = {
         brick: { src: 'assets/objetos/spr_brick_strip4.png', frames: 4, img: null },
         qblock_base: { src: 'assets/objetos/spr_qblock_winged_strip4.png', frames: 4, img: null },
         desactivado: { src: 'assets/objetos/desactivado.png', img: null }, // Deactivated block
-        fireflower: { src: 'assets/objetos/spr_fireflower_strip4.png', frames: 4, img: null }
+        fireflower: { src: 'assets/objetos/spr_fireflower_strip4.png', frames: 4, img: null },
+        // Custom Assets
+        gean: { src: 'assets/artistas/gean.png', frames: 4, img: null },
+        radio: { src: 'assets/artistas/radio.png', img: null },
+        nota: { src: 'assets/artistas/nota.png', img: null },
+        bluecoin: { src: 'assets/objetos/spr_coinblue_strip4.png', frames: 4, img: null }
     }
 };
 // Preload Mario & Object Assets
@@ -36,6 +41,7 @@ const preloadList = [
     ...Object.values(ASSETS.mario),
     ASSETS.tiles.castle,
     ASSETS.tiles.coin,
+    ASSETS.tiles.bluecoin, // Load blue coin
     ASSETS.tiles.paragoomba,
     ASSETS.tiles.piranha,
     ASSETS.tiles.pipe,
@@ -43,7 +49,11 @@ const preloadList = [
     ASSETS.tiles.brick,
     ASSETS.tiles.qblock_base,
     ASSETS.tiles.desactivado,
-    ASSETS.tiles.fireflower
+    ASSETS.tiles.desactivado,
+    ASSETS.tiles.fireflower,
+    ASSETS.tiles.gean,
+    ASSETS.tiles.radio,
+    ASSETS.tiles.nota
 ];
 preloadList.forEach(obj => {
     if (obj && obj.src) {
@@ -52,6 +62,21 @@ preloadList.forEach(obj => {
     }
 });
 ASSETS.sprites.src = 'assets/sprites.png';
+
+ASSETS.sprites.src = 'assets/sprites.png';
+
+// --- EMOJI MASTER ---
+const EMOJI_MASTER = {
+    'corazon1': '❤️',
+    'corazon_rosa': '💖',
+    'estrella1': '⭐',
+    'fuego': '🔥',
+    'musica': '🎵',
+    'destello': '✨',
+    'fiesta': '🎉',
+    'risa': '😂',
+    'beso': '😘'
+};
 
 // --- GAME CONSTANTS ---
 const GRAVITY = 0.6;
@@ -90,6 +115,7 @@ const GameAudio = {
     ctx: null,
     bgmAudio: new Audio('Sound/FondoMusica.mp3'),
     romanticAudio: null, // Will be created when needed
+    geanAudio: new Audio('assets/artistas/musicagean.mp3'), // New Music
     brickBreak: new Audio('Sound/brick_break.mp3'),
     volume: 0.4,
 
@@ -111,17 +137,19 @@ const GameAudio = {
     },
 
     playTone: (freq, type, duration) => {
-        if (!GameAudio.ctx) return;
+        if (!GameAudio.ctx || GameAudio.muted) return; // Respect mute
         const osc = GameAudio.ctx.createOscillator();
         const gain = GameAudio.ctx.createGain();
         osc.type = type;
         osc.frequency.setValueAtTime(freq, GameAudio.ctx.currentTime);
 
-        // Scale sound effects volume relative to master volume (slightly louder)
-        const sfxVol = Math.min(1, GameAudio.volume + 0.1);
+        // Scale sound effects volume relative to master volume
+        // If volume is 0, sfx should be 0.
+        // We use GameAudio.volume as base.
+        const sfxVol = Math.max(0, GameAudio.volume);
 
         gain.gain.setValueAtTime(0.1 * sfxVol, GameAudio.ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, GameAudio.ctx.currentTime + duration);
+        gain.gain.exponentialRampToValueAtTime(0.01 * (sfxVol > 0 ? 1 : 0), GameAudio.ctx.currentTime + duration);
         osc.connect(gain);
         gain.connect(GameAudio.ctx.destination);
         osc.start();
@@ -170,24 +198,31 @@ const GameAudio = {
         }
     },
     playRomanticMusic: () => {
-        if (!GameAudio.romanticAudio) {
-            GameAudio.romanticAudio = new Audio('Sound/FondoMusica.mp3'); // Using same music for now
-            GameAudio.romanticAudio.volume = GameAudio.volume * 0.7;
-        }
+        // Stop BGM
         GameAudio.bgmAudio.pause();
-        GameAudio.romanticAudio.currentTime = 0;
-        GameAudio.romanticAudio.play().catch(e => console.log(e));
 
-        // Return to normal music after 10 seconds
-        setTimeout(() => {
-            if (GameAudio.romanticAudio) {
-                GameAudio.romanticAudio.pause();
-                GameAudio.romanticAudio.currentTime = 0;
+        // Stop Game Timer (Infinite Time for Song)
+        if (gameTimerInterval) {
+            clearInterval(gameTimerInterval);
+            // Update time display to infinity symbol or max
+            const timerEl = document.getElementById('timer-display');
+            if (timerEl) timerEl.innerText = "∞";
+        }
+
+        // Play Artista Music
+        if (GameAudio.geanAudio) {
+            if (GameAudio.muted) {
+                GameAudio.geanAudio.volume = 0; // Muted
+                // Still play so it can be unmuted later? Or just set state.
+                // Let's play but volume 0 so loop starts.
+            } else {
+                GameAudio.geanAudio.volume = GameAudio.volume;
             }
-            if (!GameAudio.muted) {
-                GameAudio.bgmAudio.play().catch(e => console.log(e));
-            }
-        }, 10000);
+            GameAudio.geanAudio.loop = true;
+            GameAudio.geanAudio.play().catch(e => console.log('Music play error:', e));
+        }
+
+        // Notes visual effect is handled in game loop
     }
 };
 
@@ -227,6 +262,22 @@ window.onload = async () => {
                 console.warn('ID not found, using default');
             }
         } catch (e) { console.error(e); }
+    }
+
+    // --- DYNAMIC ASSET LOADING (Personalization) ---
+    if (messageData) {
+        // 1. Artist Handling (Gean default)
+        if (messageData.nombre_artista) {
+            const artista = messageData.nombre_artista.toLowerCase();
+            // Update Asset Source
+            ASSETS.tiles.gean.src = `assets/artistas/${artista}.png`;
+            // Update Audio Source (Assuming format: musica[nombre].mp3)
+            GameAudio.geanAudio = new Audio(`assets/artistas/musica${artista}.mp3`);
+        }
+
+        // Reload Gean Image with new source
+        ASSETS.tiles.gean.img = new Image();
+        ASSETS.tiles.gean.img.src = ASSETS.tiles.gean.src;
     }
 
     // 2. Setup Canvas
@@ -277,6 +328,42 @@ window.onload = async () => {
         volSlider.addEventListener('input', (e) => {
             GameAudio.setVolume(e.target.value);
         });
+    }
+
+    // 7. Mobile Controls
+    const btnLeft = document.getElementById('btn-left');
+    const btnRight = document.getElementById('btn-right');
+    const btnJump = document.getElementById('btn-jump');
+
+    if (btnLeft) {
+        const handleLeftStart = (e) => { e.preventDefault(); keys.left = true; };
+        const handleLeftEnd = (e) => { e.preventDefault(); keys.left = false; };
+
+        btnLeft.addEventListener('touchstart', handleLeftStart);
+        btnLeft.addEventListener('touchend', handleLeftEnd);
+        btnLeft.addEventListener('mousedown', handleLeftStart);
+        btnLeft.addEventListener('mouseup', handleLeftEnd);
+        btnLeft.addEventListener('mouseleave', handleLeftEnd);
+    }
+
+    if (btnRight) {
+        const handleRightStart = (e) => { e.preventDefault(); keys.right = true; };
+        const handleRightEnd = (e) => { e.preventDefault(); keys.right = false; };
+
+        btnRight.addEventListener('touchstart', handleRightStart);
+        btnRight.addEventListener('touchend', handleRightEnd);
+        btnRight.addEventListener('mousedown', handleRightStart);
+        btnRight.addEventListener('mouseup', handleRightEnd);
+        btnRight.addEventListener('mouseleave', handleRightEnd);
+    }
+
+    if (btnJump) {
+        const handleJump = (e) => {
+            e.preventDefault();
+            if (player) player.jump();
+        };
+        btnJump.addEventListener('touchstart', handleJump);
+        btnJump.addEventListener('mousedown', handleJump);
     }
 };
 
@@ -329,8 +416,7 @@ function initGame() {
         if (gameState !== 'PLAYING') return;
         gameTime--;
         if (gameTime <= 0) {
-            alert('¡Se acabó el tiempo!');
-            location.reload();
+            gameOver();
         }
         updateUI();
     }, 1000);
@@ -363,8 +449,8 @@ function initGame() {
     // SPECIAL BLOCKS NEAR CASTLE
     // 1. Coins Block (5 coins)
     blocks.push({ x: houseX - 150, y: floorY - 150, w: TILE_SIZE, h: TILE_SIZE, type: 'qblock', hit: false, content: 'multi_coin', coinsLeft: 5 });
-    // 2. Win Block (Flower/Message)
-    blocks.push({ x: houseX - 50, y: floorY - 150, w: TILE_SIZE, h: TILE_SIZE, type: 'qblock', hit: false, content: 'flower' });
+    // 2. Win Block (Blue Coin Surprise)
+    blocks.push({ x: houseX - 50, y: floorY - 150, w: TILE_SIZE, h: TILE_SIZE, type: 'qblock', hit: false, content: 'blue_coin' });
 
 
     const pipeX = canvas.width * 0.5;
@@ -396,8 +482,13 @@ function initGame() {
         breakable: false
     });
 
-    // Piranha Plant (Hidden inside pipe initially)
-    enemies.push(new Enemy(pipeX, floorY - pipeH, 0, false, 'piranha'));
+    // Piranha Plant (Hidden inside pipe initially) - Proper size
+    const piranha = new Enemy(pipeX + 5, floorY - pipeH, 0, false, 'piranha');
+    piranha.w = 50; // Normal width
+    piranha.h = 60; // Normal height
+    piranha.piranhaHiddenY = floorY - pipeH; // Hidden at pipe top
+    piranha.piranhaShowY = floorY - pipeH - 50; // Show 50px above pipe
+    enemies.push(piranha);
 
     // MOVE QUESTION BLOCKS NEAR PIPES
     // Block 1 (Radio trigger) - 5 hits
@@ -472,8 +563,7 @@ function initGame() {
     enemies.push(new Enemy(canvas.width * 0.3, floorY - 60, 100));
     enemies.push(new Enemy(canvas.width * 0.6, floorY - 60, 150));
     enemies.push(new Enemy(canvas.width * 1.2, floorY - 60, 200));
-    // New Enemies
-    enemies.push(new Enemy(canvas.width * 0.6, floorY - 280 - 60, 100, false, 'paragoomba')); // On floating platform
+    // Removed the floating platform enemy that was blocking the player
     enemies.push(new Enemy(canvas.width * 1.4, floorY - 60, 150)); // Far right
 
     // --- RIGHT EXPANSION ( > CanvasWidth) ---
@@ -487,13 +577,18 @@ function initGame() {
         type: 'cloud',
         x: photoX1,
         y: floorY - 500,
-        text: "Con mucho cariño para ti",
+        text: `✨ El mundo de ${messageData.nombre || 'TI'} ✨`,
         w: 300,
         h: 100,
-        floatOffset: 0
+        floatOffset: 0,
+        sparkle: true
     });
-    // One Photo with Float Animation
-    decorations.push({ type: 'photo', img: 'assets/photo1.png', x: photoX1, y: floorY - 250, w: 200, h: 200, floatOffset: 0 });
+    // One Photo with Float Animation (Custom Image Support)
+    const photoUrl = messageData.url_imagen || 'assets/artistas/chancho.jpg';
+    // Center photo below cloud (Cloud W=300, Photo W=200). 
+    // Cloud center is photoX1. Photo is drawn from top-left.
+    // So Photo X should be photoX1 - 100.
+    decorations.push({ type: 'photo', img: photoUrl, x: photoX1 - 100, y: floorY - 250, w: 200, h: 200, floatOffset: 0 });
 
     // --- LEFT EXPANSION ( < 0 ) ---
     // Floor Extended Left
@@ -585,14 +680,60 @@ function loop() {
                 ctx.fill();
             }
 
-            // Text with glow
+            // Text with glow AND white border
             ctx.save();
             ctx.shadowColor = '#d946ef';
             ctx.shadowBlur = 15;
-            ctx.fillStyle = '#d946ef';
             ctx.font = 'bold 24px Outfit';
             ctx.textAlign = 'center';
+
+            // White Border (Stroke)
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 4;
+            ctx.strokeText(d.text, d.x, cy + 120);
+
+            // Inner Text
+            ctx.fillStyle = messageData.color || '#d946ef';
             ctx.fillText(d.text, d.x, cy + 120);
+
+            // Sparkles Effect
+            if (d.sparkle) {
+                const now = Date.now();
+                if (!d.sparkles) d.sparkles = [];
+
+                // Add new sparkles randomly
+                if (Math.random() < 0.1) {
+                    // Start with defaults
+                    let possibleEmojis = ['✨', '⭐', '🌟'];
+
+                    // Check for personalized emojis
+                    if (messageData.emoji_1 || messageData.emoji_2) {
+                        const customEmojis = [];
+                        if (messageData.emoji_1 && EMOJI_MASTER[messageData.emoji_1]) customEmojis.push(EMOJI_MASTER[messageData.emoji_1]);
+                        if (messageData.emoji_2 && EMOJI_MASTER[messageData.emoji_2]) customEmojis.push(EMOJI_MASTER[messageData.emoji_2]);
+
+                        if (customEmojis.length > 0) possibleEmojis = customEmojis;
+                    }
+
+                    d.sparkles.push({
+                        x: d.x + (Math.random() - 0.5) * 300, // Width of text area
+                        y: cy + 120 + (Math.random() - 0.5) * 40,
+                        life: 1,
+                        emoji: possibleEmojis[Math.floor(Math.random() * possibleEmojis.length)]
+                    });
+                }
+
+                // Draw and update sparkles
+                d.sparkles.forEach((s, si) => {
+                    ctx.save();
+                    ctx.globalAlpha = s.life;
+                    ctx.font = '16px serif';
+                    ctx.fillText(s.emoji, s.x, s.y);
+                    ctx.restore();
+                    s.life -= 0.05;
+                    if (s.life <= 0) d.sparkles.splice(si, 1);
+                });
+            }
             ctx.restore();
         }
         else if (d.type === 'flag') {
@@ -633,11 +774,32 @@ function loop() {
         e.update();
         e.draw();
 
-        // Collsion with Player
+        // Collision with Player
         if (checkRectCollide(player, e) && !e.dead) {
             const playerBottom = player.y + player.h;
-            // Check stomp (Goombas only)
-            if (e.type !== 'piranha' && player.vy > 0 && playerBottom < e.y + e.h * 0.8) {
+
+            // Special handling for Gean - always bounce, no damage from any direction
+            if (e.type === 'gean') {
+                // Bounce from top ONLY
+                if (player.vy > 0 && playerBottom < e.y + e.h * 0.8) {
+                    player.vy = -8;
+                    GameAudio.bump();
+                }
+                // Side collision - Do NOTHING (pass through, no sound, no bounce)
+            }
+            // Piranha plants CAN be stomped now
+            else if (e.type === 'piranha') {
+                if (player.vy > 0 && playerBottom < e.y + e.h * 0.5) {
+                    // Stomp Piranha
+                    player.vy = -8;
+                    e.die();
+                    GameAudio.bump();
+                } else {
+                    player.takeDamage();
+                }
+            }
+            // Check stomp (Goombas and other enemies)
+            else if (player.vy > 0 && playerBottom < e.y + e.h * 0.8) {
                 // Bounce
                 player.vy = -8;
                 e.die();
@@ -762,7 +924,12 @@ function loop() {
             else if (item.type === 'flower') {
                 GameAudio.powerup();
                 winGame();
-                items.splice(i, 1); // Remover flor después de cogerla
+                items.splice(i, 1);
+            }
+            else if (item.type === 'blue_coin') {
+                GameAudio.powerup();
+                winGame();
+                items.splice(i, 1);
             }
         }
     });
@@ -798,6 +965,19 @@ function loop() {
             // Fill
             ctx.fillText(p.letter, p.x, p.y);
             ctx.restore();
+        } else if (p.type === 'note') {
+            p.y += p.vy;
+            p.x += (p.vx || 0);
+            p.life--;
+            p.alpha = Math.min(1, p.life / 60);
+            if (p.life <= 0) { particles.splice(i, 1); return; }
+
+            const noteImg = ASSETS.tiles.nota.img;
+            if (noteImg && noteImg.complete) {
+                ctx.globalAlpha = p.alpha;
+                ctx.drawImage(noteImg, p.x, p.y, 24, 24);
+                ctx.globalAlpha = 1;
+            }
         } else if (p.type === 'heart') {
             // Update heart physics
             p.y += p.vy;
@@ -886,6 +1066,14 @@ class Player {
         }
 
         this.x += this.vx;
+
+        // World Limit Check (Castle)
+        const houseX = canvas.width + 900;
+        const worldLimit = houseX + 100; // Stop at castle center
+        if (this.x > worldLimit) {
+            this.x = worldLimit;
+            this.vx = 0;
+        }
 
         // Remove Screen Bounds Clamping for Infinite World (Or clamp to new world bounds if needed)
         // For now, let's just limit not falling off too far left
@@ -1151,7 +1339,20 @@ class Enemy {
             return;
         }
 
+        // Regular enemy movement
         this.x += 2 * this.dir;
+
+        // Check collision with pipes and blocks
+        blocks.forEach(b => {
+            if (b.type === 'pipe' && checkRectCollide(this, b)) {
+                // Hit a pipe - reverse direction
+                this.dir *= -1;
+                // Move back to prevent getting stuck
+                this.x += 4 * this.dir;
+            }
+        });
+
+        // Check range boundary
         if (Math.abs(this.x - this.startX) > this.range) {
             this.dir *= -1;
         }
@@ -1178,12 +1379,17 @@ class Enemy {
 
             ctx.save();
             if (this.special) ctx.filter = 'hue-rotate(90deg) brightness(1.2)';
-            if (this.dir === -1 && this.type === 'paragoomba') {
-                // Flip for left
+
+            // Flip sprite based on direction for ALL enemies (not just paragoomba)
+            // dir = 1 means moving right (default sprite faces left, so flip it)
+            // dir = -1 means moving left (keep original)
+            if (this.dir === 1 && this.type !== 'piranha') {
+                // Moving right - flip the sprite
                 ctx.translate(this.x + this.w, this.y);
                 ctx.scale(-1, 1);
                 ctx.drawImage(spriteData.img, frameIndex * frameW, 0, frameW, frameH, 0, 0, this.w, this.h);
             } else {
+                // Moving left or piranha - normal orientation
                 ctx.drawImage(spriteData.img, frameIndex * frameW, 0, frameW, frameH, this.x, this.y, this.w, this.h);
             }
             ctx.restore();
@@ -1255,7 +1461,10 @@ class Item {
             }
             return;
         }
-        if (this.y > this.targetY && this.type === 'flower') this.y -= 1;
+        // Rise animation for Flower AND Blue Coin
+        if (this.y > this.targetY && (this.type === 'flower' || this.type === 'blue_coin')) {
+            this.y -= 1;
+        }
     }
     draw() {
         if (this.type === 'coin' && ASSETS.tiles.coin.img && ASSETS.tiles.coin.img.complete) {
@@ -1270,26 +1479,35 @@ class Item {
             const frameW = ASSETS.tiles.fireflower.img.naturalWidth / frames;
             const frameH = ASSETS.tiles.fireflower.img.naturalHeight;
             ctx.drawImage(ASSETS.tiles.fireflower.img, frameIndex * frameW, 0, frameW, frameH, this.x, this.y, this.w, this.h);
+        } else if (this.type === 'blue_coin' && ASSETS.tiles.bluecoin.img && ASSETS.tiles.bluecoin.img.complete) {
+            const frames = ASSETS.tiles.bluecoin.frames;
+            const frameIndex = Math.floor(Date.now() / 150) % frames;
+            const frameW = ASSETS.tiles.bluecoin.img.naturalWidth / frames;
+            const frameH = ASSETS.tiles.bluecoin.img.naturalHeight;
+            ctx.drawImage(ASSETS.tiles.bluecoin.img, frameIndex * frameW, 0, frameW, frameH, this.x, this.y, this.w, this.h);
         } else if (this.type === 'radio') {
-            // Draw Radio with balloon
-            ctx.save();
-            // Balloon string
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(this.x + this.w / 2, this.y + 10);
-            ctx.lineTo(this.x + this.w / 2, this.y - 30);
-            ctx.stroke();
-            // Balloon
-            ctx.fillStyle = '#ff4444';
-            ctx.beginPath();
-            ctx.ellipse(this.x + this.w / 2, this.y - 50, 20, 25, 0, 0, Math.PI * 2);
-            ctx.fill();
-            // Radio Emoji / Design
-            ctx.font = '40px sans-serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('📻', this.x + this.w / 2, this.y + this.h);
-            ctx.restore();
+            // Draw Radio Image
+            const img = ASSETS.tiles.radio.img;
+            if (img && img.complete) {
+                ctx.drawImage(img, this.x, this.y, this.w, this.h);
+            } else {
+                // Fallback Balloon config
+                ctx.save();
+                ctx.fillText('📻', this.x + this.w / 2, this.y + this.h);
+                ctx.restore();
+            }
+
+            // Spawn notes if music is playing (Checked via global state or just visual effect here)
+            // We'll spawn notes stored in 'particles' from the main loop, but here is a good place to initiate if active.
+            // Actually, let's just make the radio emit notes constantly if it exists? 
+            // The user said notes appear "simulando que esta sonando la musca" (when music plays).
+            // Music plays after collection. But wait, if collected, the item is removed!
+            // So we need a persistent "Radio Active" state or entity.
+
+            // Re-reading: "mario se debe hacercar a la radio y tocar par aque recien muestere eal animacion de que se esta sonando la cacion"
+            // "Mario approaches radio, touches it -> Music starts -> Animation shows"
+            // If item is spliced, we can't show notes above it. 
+            // Logic: Radio turns into a non-collidable "Active Radio" decoration or we keep it and disable collision.
         } else {
             // Fallback
             const sprite = this.type === 'coin' ? SPRITES.coin : SPRITES.flower;
@@ -1392,39 +1610,55 @@ function hitBlock(b) {
         return;
     }
 
-    // Original block logic
-    b.hit = true;
+    // Handle radio_trigger BEFORE marking as hit
+    if (b.content === 'radio_trigger') {
+        if (b.hitsLeft > 0) {
+            b.hitsLeft--;
+            console.log('Hits left:', b.hitsLeft);
 
-    if (!b.hit || b.content === 'multi_coin') { // Allow re-hit for multi-coin
-        if (b.content === 'coin') {
-            b.hit = true;
-            spawnItem(b, 'coin');
-        } else if (b.content === 'multi_coin') {
-            spawnItem(b, 'coin');
-            if (b.coinsLeft) {
-                b.coinsLeft--;
-                if (b.coinsLeft <= 0) b.hit = true;
-                else b.hit = false; // Keep active
-            }
-        } else if (b.content === 'radio_trigger') {
+            // Coin effect for first 4 hits
             if (b.hitsLeft > 0) {
-                b.hitsLeft--;
-                GameAudio.bump();
-                // Pop effect
-                b.y -= 10;
-                setTimeout(() => b.y += 10, 100);
-
-                if (b.hitsLeft === 0) {
-                    b.hit = true;
-                    spawnRadioDrop(b);
-                }
+                spawnItem(b, 'coin');
+                b.hit = false; // Keep block active
+            } else {
+                // Fifth hit - spawn radio
+                b.hit = true;
+                spawnRadioDrop(b);
             }
-        } else if (b.content === 'flower') {
-            b.hit = true;
-            spawnItem(b, 'flower');
-        } else {
-            b.hit = true;
+
+            // Pop effect
+            b.y -= 10;
+            setTimeout(() => b.y += 10, 100);
         }
+        return;
+    }
+
+    // Handle multi_coin blocks
+    if (b.content === 'multi_coin') {
+        spawnItem(b, 'coin');
+        if (b.coinsLeft) {
+            b.coinsLeft--;
+            if (b.coinsLeft <= 0) {
+                b.hit = true;
+            } else {
+                b.hit = false; // Keep active
+            }
+        }
+        return;
+    }
+
+    // Handle other block types
+    if (b.content === 'coin') {
+        b.hit = true;
+        spawnItem(b, 'coin');
+    } else if (b.content === 'flower') {
+        b.hit = true;
+        spawnItem(b, 'flower');
+    } else if (b.content === 'blue_coin') {
+        b.hit = true;
+        spawnItem(b, 'blue_coin');
+    } else {
+        b.hit = true;
     }
 }
 
@@ -1449,6 +1683,14 @@ function spawnItem(block, type) {
         const scoreEl = document.getElementById('coin-display');
         coinsCollected++;
         updateUI();
+        updateUI();
+    } else if (type === 'blue_coin') {
+        // Blue Coin = WIN TRIGGER
+        // Stays in place, waiting for collection
+        GameAudio.coin();
+        const item = new Item(block.x + (block.w - 32) / 2, block.y - 32, 'blue_coin', false);
+        item.targetY = block.y - 64;
+        items.push(item);
     } else {
         items.push(new Item(block.x + (block.w - 32) / 2, block.y - 32, 'flower'));
     }
@@ -1456,14 +1698,23 @@ function spawnItem(block, type) {
 
 // Romantic effect: Many hearts falling
 function spawnRomanticEffect() {
-    // Play romantic music
-    GameAudio.playRomanticMusic();
+    // NO music - only visual effect (music is only for radio)
 
+    // Spawn MANY hearts in all directions
     // Spawn MANY hearts in all directions
     for (let i = 0; i < 50; i++) {
         setTimeout(() => {
             const angle = (Math.PI * 2 * i) / 50;
             const speed = 2 + Math.random() * 3;
+
+            // Determine emojis (Personalized)
+            let possibleEmojis = ['❤️', '💖', '💕', '💗', '💝', '💓', '💞', '✨'];
+            if (messageData.emoji_1 || messageData.emoji_2) {
+                const custom = [];
+                if (messageData.emoji_1 && EMOJI_MASTER[messageData.emoji_1]) custom.push(EMOJI_MASTER[messageData.emoji_1]);
+                if (messageData.emoji_2 && EMOJI_MASTER[messageData.emoji_2]) custom.push(EMOJI_MASTER[messageData.emoji_2]);
+                if (custom.length > 0) possibleEmojis = custom;
+            }
 
             particles.push({
                 type: 'heart',
@@ -1474,7 +1725,7 @@ function spawnRomanticEffect() {
                 life: 120 + Math.random() * 60,
                 alpha: 1,
                 size: 20 + Math.random() * 20,
-                emoji: ['❤️', '💖', '💕', '💗', '💝', '💓', '💞', '✨'][Math.floor(Math.random() * 8)]
+                emoji: possibleEmojis[Math.floor(Math.random() * possibleEmojis.length)]
             });
         }, i * 30);
     }
@@ -1561,8 +1812,12 @@ GameAudio.playWinTheme = () => {
 };
 // Helper to spawn radio from sky
 function spawnRadioDrop(block) {
-    const radio = new Item(block.x, -100, 'radio');
-    radio.vy = 2; // Slow fall
+    // Position Radio Drop - More to the left between pipes
+    const dropX = block.x - 20; // Position more to the left
+    const radio = new Item(dropX, -100, 'radio');
+    radio.vy = 4; // Faster fall
+    radio.w = 50; radio.h = 50; // radio size
+    radio.groundX = dropX; // Store final position
     radio.update = function () {
         this.y += this.vy;
         const groundY = canvas.height - 100 - this.h;
@@ -1575,26 +1830,79 @@ function spawnRadioDrop(block) {
 }
 
 function spawnMariachis() {
-    for (let i = 0; i < 5; i++) {
-        setTimeout(() => {
-            const mx = player.x + (i - 2) * 80;
-            const my = canvas.height - 100 - 60;
-            const mariachi = new Enemy(mx, my, 0, false, 'mariachi');
-            mariachi.update = function () {
-                // Dance animation
-                this.y = this.startY + Math.sin(Date.now() / 200) * 10;
-            };
-            mariachi.draw = function () {
-                ctx.save();
-                ctx.font = '50px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText('👨‍🎤', this.x, this.y + 40); // Mariachi Emoji fallback
-                ctx.font = '20px sans-serif';
-                ctx.fillText('🎻', this.x + 20, this.y + 20);
-                ctx.restore();
-            };
-            mariachi.die = () => { }; // Immortals
-            enemies.push(mariachi);
-        }, i * 200);
-    }
+    // 1. Audio is already started in Item collision.
+
+    // 2. Spawn the "Gean" character - More to the left
+    // Position relative to player but more to the left
+    const floorY = canvas.height - 100;
+    const gean = new Enemy(player.x - 120, floorY - 80, 0, false, 'gean'); // Moved further left (was -50)
+    gean.startY = floorY - 80; // Ensure reference for animation is grounded
+
+    gean.w = 64; gean.h = 80; // Adjust size
+    gean.update = function () {
+        // Dance / Idle
+        // Simple bobbing to music
+        this.y = this.startY + Math.sin(Date.now() / 150) * 5;
+    };
+    gean.draw = function () {
+        const sprite = ASSETS.tiles.gean;
+        if (sprite && sprite.img && sprite.img.complete) {
+            const speed = 150;
+            const frameIndex = Math.floor(Date.now() / speed) % sprite.frames;
+            const frameW = sprite.img.naturalWidth / sprite.frames;
+            const frameH = sprite.img.naturalHeight;
+
+            // Draw Gean
+            ctx.drawImage(sprite.img, frameIndex * frameW, 0, frameW, frameH, this.x, this.y, this.w, this.h);
+        } else {
+            // Fallback
+            ctx.font = '50px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('👨‍🎤', this.x, this.y + 40);
+        }
+    };
+    gean.die = function () { }; // Invincible
+    enemies.push(gean);
+
+    // 3. Spawn floating Notes (Simulation)
+    const noteInterval = setInterval(() => {
+        if (gameState !== 'PLAYING') return;
+        // Check if gean still exists
+        if (!enemies.includes(gean)) {
+            clearInterval(noteInterval);
+            return;
+        }
+        particles.push({
+            type: 'note',
+            x: gean.x + Math.random() * 60, // Near Mariachi/Radio
+            y: gean.y - 20,
+            vy: -1.5,
+            vx: Math.random() * 2 - 1,
+            life: 120,
+            alpha: 1
+        });
+    }, 800);
+
+    // 4. Auto-remove after 90 seconds (1.5 minutes)
+    setTimeout(() => {
+        // Stop music
+        if (GameAudio.geanAudio) {
+            GameAudio.geanAudio.pause();
+            GameAudio.geanAudio.currentTime = 0;
+        }
+
+        // Resume background music
+        if (!GameAudio.muted) {
+            GameAudio.bgmAudio.play().catch(e => console.log(e));
+        }
+
+        // Remove Gean
+        const geanIndex = enemies.indexOf(gean);
+        if (geanIndex > -1) {
+            enemies.splice(geanIndex, 1);
+        }
+
+        // Clear note interval
+        clearInterval(noteInterval);
+    }, 90000); // 90 seconds = 1.5 minutes
 }

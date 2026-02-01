@@ -113,6 +113,49 @@
                         <label class="text-sm text-slate-400 mb-1">Mensaje</label>
                         <textarea id="hola-mensaje" rows="4" placeholder="Escribe algo bonito..."></textarea>
                     </div>
+
+                    <!-- Personalización Avanzada -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="flex flex-col">
+                            <label class="text-sm text-slate-400 mb-1">Color Tema</label>
+                            <input type="color" id="hola-color" class="h-10 w-full p-1 cursor-pointer" value="#ff007f">
+                        </div>
+                        <div class="flex flex-col">
+                            <label class="text-sm text-slate-400 mb-1">Artista</label>
+                            <select id="hola-artista">
+                                <option value="gean">Gean (Default)</option>
+                                <option value="yatra">Sebastian Yatra</option>
+                                <option value="taylor">Taylor Swift</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col">
+                        <label class="text-sm text-slate-400 mb-1">URL Imagen (Animalito)</label>
+                        <input type="text" id="hola-imagen" placeholder="https://... o deje vacío para Chancho">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="flex flex-col">
+                            <label class="text-sm text-slate-400 mb-1">Emoji 1</label>
+                            <select id="hola-emoji1">
+                                <option value="">Aleatorio</option>
+                                <option value="corazon1">Corazón Rojo (❤️)</option>
+                                <option value="estrella1">Estrella (⭐)</option>
+                                <option value="fuego">Fuego (🔥)</option>
+                                <option value="musica">Música (🎵)</option>
+                            </select>
+                        </div>
+                        <div class="flex flex-col">
+                            <label class="text-sm text-slate-400 mb-1">Emoji 2</label>
+                            <select id="hola-emoji2">
+                                <option value="">Aleatorio</option>
+                                <option value="destello">Destello (✨)</option>
+                                <option value="corazon_rosa">Corazón Rosa (💖)</option>
+                                <option value="fiesta">Fiesta (🎉)</option>
+                            </select>
+                        </div>
+                    </div>
                     <button id="save-hola" class="w-full btn-primary py-3 rounded-xl font-bold">Guardar Mensaje</button>
                 </div>
 

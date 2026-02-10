@@ -181,17 +181,27 @@ const GameAudio = {
         GameAudio.brickBreak.currentTime = 0;
         GameAudio.brickBreak.play().catch(e => console.log(e));
     },
-    gameOver: () => {
+    gameOver: (reason = 'lives') => {
         GameAudio.stopBGM();
         if (GameAudio.geanAudio) GameAudio.geanAudio.pause();
         if (!GameAudio.muted) {
             GameAudio.gameOverAudio.play().catch(e => console.log(e));
         }
-        // Redirect or reload after sound finishes (approx 4 seconds)
-        setTimeout(() => {
-            alert('¡Oh no! Inténtalo de nuevo.');
-            location.reload();
-        }, 4000);
+
+        const overlay = document.getElementById('gameover-overlay');
+        const title = document.getElementById('gameover-title');
+        const message = document.getElementById('gameover-message');
+
+        if (overlay) {
+            if (reason === 'time') {
+                if (title) title.innerText = '¡TIEMPO AGOTADO!';
+                if (message) message.innerText = '¡El tiempo se ha terminado! Inténtalo de nuevo.';
+            } else {
+                if (title) title.innerText = '¡GAME OVER!';
+                if (message) message.innerText = 'No te rindas, ¡vuelve a intentarlo!';
+            }
+            overlay.classList.remove('hidden');
+        }
     },
     powerup: () => {
         let now = GameAudio.ctx.currentTime;
@@ -436,7 +446,7 @@ function initGame() {
         if (gameState !== 'PLAYING') return;
         gameTime--;
         if (gameTime <= 0) {
-            GameAudio.gameOver();
+            GameAudio.gameOver('time');
         }
         updateUI();
     }, 1000);
@@ -920,9 +930,11 @@ function loop() {
                 }
             }
             else if (item.type === 'coin') {
-                GameAudio.coin();
-                coinsCollected++;
-                updateUI();
+                if (!item.autoCollect) { // Don't double collect auto-counted coins
+                    GameAudio.coin();
+                    coinsCollected++;
+                    updateUI();
+                }
                 items.splice(i, 1);
             }
             else if (item.type === 'fireflower') {
@@ -1716,7 +1728,7 @@ function hitBlock(b) {
         spawnItem(b, 'blue_coin');
     } else if (b.content === 'cake_trigger') {
         b.hit = true;
-        spawnPixelCake(-400, canvas.height - 100); // Spawn at the far left on the floor level
+        spawnPixelHeart(-400, canvas.height - 100); // Spawn at the far left on the floor level
     } else {
         b.hit = true;
     }
@@ -1740,9 +1752,7 @@ function spawnItem(block, type) {
     if (type === 'coin') {
         GameAudio.coin();
         items.push(new Item(block.x + (block.w - 32) / 2, block.y - 40, 'coin', true));
-        const scoreEl = document.getElementById('coin-display');
         coinsCollected++;
-        updateUI();
         updateUI();
     } else if (type === 'blue_coin') {
         // Blue Coin = WIN TRIGGER
@@ -1990,47 +2000,40 @@ function spawnFireworks(centerX, y) {
             life: 80 + Math.random() * 40
         });
 
-        // Sound
-        if (count % 4 === 0) GameAudio.coin();
+        // Firework visual, NO coin sound (User feedback: sounds like too many coins without stopping)
         count++;
     }, 200);
 }
 
-// --- PIXEL CAKE ---
-function spawnPixelCake(startX, baseY) {
+// --- PIXEL HEART ---
+function spawnPixelHeart(startX, baseY) {
     const pSize = 30; // Size of each "pixel" block
-    const cakeMap = [
-        [0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0],
-        [0, 0, 0, 0, 0, 0, 1, 1, 4, 4, 1, 1],
-        [0, 0, 0, 0, 1, 1, 1, 4, 4, 1, 1, 4],
-        [0, 0, 0, 1, 1, 4, 4, 1, 1, 4, 4, 1],
-        [0, 0, 1, 1, 1, 4, 4, 1, 1, 1, 1, 1],
-        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        [1, 1, 1, 5, 5, 5, 1, 1, 5, 5, 1, 1],
-        [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
-        [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
-        [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
-        [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3],
-        [3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 2]
+    const heartMap = [
+        [0, 1, 1, 0, 0, 0, 1, 1, 0],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1],
+        [1, 3, 1, 1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1, 1, 1],
+        [0, 1, 1, 1, 1, 1, 1, 1, 0],
+        [0, 0, 1, 1, 1, 1, 1, 0, 0],
+        [0, 0, 0, 1, 1, 1, 0, 0, 0],
+        [0, 0, 0, 0, 1, 0, 0, 0, 0]
     ];
 
     const colors = {
-        1: '#4A2E19', // Dark Brown (Chocolate)
-        2: '#E1B28C', // Tan (Cake)
-        3: '#F5DBC1', // Light Tan (Filling)
-        4: '#FFFFFF', // White (Decoration)
-        5: '#2D1B10'  // Darker Brown (Shadow)
+        1: '#e11d48', // Red (Rose 600)
+        2: '#fb7185', // Lighter Pink
+        3: '#ffffff'  // White highlight
     };
 
-    cakeMap.forEach((row, rIdx) => {
+    heartMap.forEach((row, rIdx) => {
         row.forEach((cell, cIdx) => {
             if (cell !== 0) {
                 blocks.push({
                     x: startX + cIdx * pSize,
-                    y: baseY - (cakeMap.length - rIdx) * pSize,
+                    y: baseY - (heartMap.length - rIdx) * pSize,
                     w: pSize,
                     h: pSize,
-                    type: 'cake',
+                    type: 'cake', // Keeping type 'cake' so collision logic still works (eating it)
                     color: colors[cell],
                     hit: false,
                     broken: false

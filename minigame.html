@@ -125,7 +125,7 @@
 
         <!-- Mobile Controls -->
         <div id="mobile-controls"
-            class="absolute bottom-14 left-0 right-0 flex justify-between px-6 pointer-events-none z-40 w-full max-w-4xl mx-auto">
+            class="absolute bottom-32 left-0 right-0 flex justify-between px-6 pointer-events-none z-40 w-full max-w-4xl mx-auto">
             <!-- Left Side - Movement -->
             <div class="flex gap-4 pointer-events-auto">
                 <!-- Left Button -->
@@ -212,22 +212,31 @@
         </div>
     </div>
 
-    <!-- Game Over Overlay (Time Up) -->
+    <!-- Game Over Overlay (Lives out or Time up) -->
     <div id="gameover-overlay"
-        class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+        class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
         <div
-            class="bg-white p-8 rounded-3xl max-w-sm text-center mx-4 shadow-2xl relative overflow-hidden animate__animated animate__fadeInDown">
-            <!-- Decorative Strip -->
-            <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-red-400 via-orange-400 to-red-400"></div>
+            class="modal-content p-8 md:p-12 rounded-3xl max-w-sm w-full text-center mx-4 shadow-2xl relative overflow-hidden animate__animated animate__zoomIn">
 
-            <h2 class="text-3xl font-bold text-red-500 mb-2 font-script">¡Se acabó el tiempo!</h2>
-            <div class="text-6xl mb-4 animate__animated animate__tada animate__infinite">⏰</div>
-            <p class="text-lg text-gray-600 mb-6">¡Inténtalo de nuevo!</p>
+            <!-- Decorative Elements -->
+            <div class="absolute -top-10 -left-10 w-32 h-32 bg-red-500 rounded-full blur-[40px] opacity-30"></div>
+            <div class="absolute -bottom-10 -right-10 w-32 h-32 bg-orange-500 rounded-full blur-[40px] opacity-30">
+            </div>
 
-            <button onclick="location.reload()"
-                class="w-full bg-gradient-to-r from-red-500 to-orange-500 text-white px-6 py-3 rounded-full text-lg font-bold shadow-lg hover:scale-105 transition-transform active:scale-95 flex items-center justify-center gap-2">
-                <span>🔄</span> Aceptar
-            </button>
+            <div class="relative z-10">
+                <div class="text-7xl mb-6 animate__animated animate__headShake animate__infinite">😵</div>
+                <h2 id="gameover-title" class="text-4xl font-extrabold text-white mb-2 tracking-tight">¡GAME OVER!</h2>
+                <div class="h-1 w-20 bg-gradient-to-r from-red-500 to-orange-500 mx-auto mb-6 rounded-full"></div>
+
+                <p id="gameover-message" class="text-lg text-slate-200 mb-8 font-light">
+                    No te rindas, ¡vuelve a intentarlo!
+                </p>
+
+                <button onclick="location.reload()"
+                    class="w-full bg-gradient-to-r from-red-500 via-orange-500 to-red-500 bg-[length:200%_auto] hover:bg-right text-white px-6 py-4 rounded-2xl text-xl font-bold shadow-[0_10px_20px_-10px_rgba(239,68,68,0.5)] transition-all transform active:scale-95 flex items-center justify-center gap-3">
+                    <span class="text-2xl">🔄</span> Reintentar
+                </button>
+            </div>
         </div>
     </div>
 
